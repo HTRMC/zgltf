@@ -95,6 +95,32 @@ pub const Accessor = struct {
     name: ?[]const u8 = null,
 };
 
+pub const PrimitiveMode = enum(u32) {
+    points = 0,
+    lines = 1,
+    line_loop = 2,
+    line_strip = 3,
+    triangles = 4,
+    triangle_strip = 5,
+    triangle_fan = 6,
+};
+
+pub const Attributes = std.json.ArrayHashMap(u32);
+
+pub const Primitive = struct {
+    attributes: Attributes,
+    indices: ?u32 = null,
+    material: ?u32 = null,
+    mode: u32 = @intFromEnum(PrimitiveMode.triangles),
+    targets: ?[]Attributes = null,
+};
+
+pub const Mesh = struct {
+    primitives: []Primitive,
+    weights: ?[]f32 = null,
+    name: ?[]const u8 = null,
+};
+
 pub const Scene = struct {
     nodes: ?[]u32 = null,
     name: ?[]const u8 = null,
@@ -130,6 +156,7 @@ pub const Gltf = struct {
     scene: ?u32 = null,
     scenes: ?[]Scene = null,
     nodes: ?[]Node = null,
+    meshes: ?[]Mesh = null,
     buffers: ?[]Buffer = null,
     bufferViews: ?[]BufferView = null,
     accessors: ?[]Accessor = null,
@@ -264,6 +291,55 @@ test "scenes" {
     try testing.expectEqualStrings("main", p.value.scenes.?[0].name.?);
 }
 
+test "mesh primitive defaults" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "meshes":[{"primitives":[{"attributes":{"POSITION":0}}]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const prim = p.value.meshes.?[0].primitives[0];
+    try testing.expectEqual(@as(u32, @intFromEnum(PrimitiveMode.triangles)), prim.mode);
+    try testing.expectEqual(@as(?u32, null), prim.indices);
+    try testing.expectEqual(@as(usize, 1), prim.attributes.map.count());
+    try testing.expectEqual(@as(u32, 0), prim.attributes.map.get("POSITION").?);
+}
+
+test "mesh primitive full" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "meshes":[{"primitives":[{
+        \\   "attributes":{"POSITION":1,"NORMAL":2,"TEXCOORD_0":3},
+        \\   "indices":0,"material":0,"mode":1}]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const prim = p.value.meshes.?[0].primitives[0];
+    try testing.expectEqual(@as(u32, 1), prim.mode);
+    try testing.expectEqual(@as(u32, 0), prim.indices.?);
+    try testing.expectEqual(@as(u32, 0), prim.material.?);
+    try testing.expectEqual(@as(usize, 3), prim.attributes.map.count());
+    try testing.expectEqual(@as(u32, 1), prim.attributes.map.get("POSITION").?);
+    try testing.expectEqual(@as(u32, 2), prim.attributes.map.get("NORMAL").?);
+    try testing.expectEqual(@as(u32, 3), prim.attributes.map.get("TEXCOORD_0").?);
+}
+
+test "mesh morph targets" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "meshes":[{"primitives":[{
+        \\   "attributes":{"POSITION":0},
+        \\   "targets":[{"POSITION":1},{"POSITION":2}]}],
+        \\  "weights":[0.5,0.25]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const m = p.value.meshes.?[0];
+    try testing.expectEqual(@as(usize, 2), m.primitives[0].targets.?.len);
+    try testing.expectEqual(@as(u32, 1), m.primitives[0].targets.?[0].map.get("POSITION").?);
+    try testing.expectEqualSlices(f32, &.{ 0.5, 0.25 }, m.weights.?);
+}
+
 test "parse Triangle sample" {
     const bytes = try std.Io.Dir.cwd().readFileAlloc(
         std.testing.io,
@@ -286,4 +362,8 @@ test "parse Triangle sample" {
     try testing.expectEqual(@as(usize, 2), p.value.accessors.?.len);
     try testing.expectEqual(AccessorType.SCALAR, p.value.accessors.?[0].type);
     try testing.expectEqual(AccessorType.VEC3, p.value.accessors.?[1].type);
+    try testing.expectEqual(@as(usize, 1), p.value.meshes.?.len);
+    const prim = p.value.meshes.?[0].primitives[0];
+    try testing.expectEqual(@as(u32, 1), prim.attributes.map.get("POSITION").?);
+    try testing.expectEqual(@as(u32, 0), prim.indices.?);
 }

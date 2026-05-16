@@ -35,24 +35,24 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 - [x] Sparse accessors
 
 ### Meshes
-- [ ] Mesh primitives
-- [ ] Attribute `POSITION`
-- [ ] Attribute `NORMAL`
-- [ ] Attribute `TANGENT`
-- [ ] Attribute `TEXCOORD_0` / `TEXCOORD_1`
-- [ ] Attribute `COLOR_0`
-- [ ] Attribute `JOINTS_0`
-- [ ] Attribute `WEIGHTS_0`
-- [ ] Indexed primitives
-- [ ] Primitive mode `POINTS`
-- [ ] Primitive mode `LINES`
-- [ ] Primitive mode `LINE_LOOP`
-- [ ] Primitive mode `LINE_STRIP`
-- [ ] Primitive mode `TRIANGLES`
-- [ ] Primitive mode `TRIANGLE_STRIP`
-- [ ] Primitive mode `TRIANGLE_FAN`
-- [ ] Morph targets
-- [ ] Morph target weights
+- [x] Mesh primitives
+- [x] Attribute `POSITION`
+- [x] Attribute `NORMAL`
+- [x] Attribute `TANGENT`
+- [x] Attribute `TEXCOORD_0` / `TEXCOORD_1`
+- [x] Attribute `COLOR_0`
+- [x] Attribute `JOINTS_0`
+- [x] Attribute `WEIGHTS_0`
+- [x] Indexed primitives
+- [x] Primitive mode `POINTS`
+- [x] Primitive mode `LINES`
+- [x] Primitive mode `LINE_LOOP`
+- [x] Primitive mode `LINE_STRIP`
+- [x] Primitive mode `TRIANGLES`
+- [x] Primitive mode `TRIANGLE_STRIP`
+- [x] Primitive mode `TRIANGLE_FAN`
+- [x] Morph targets
+- [x] Morph target weights
 
 ### Materials (PBR Metallic-Roughness)
 - [ ] `baseColorFactor`
