@@ -13,10 +13,10 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 - [ ] Embedded base64 data URIs
 
 ### Asset
-- [ ] `version`
-- [ ] `minVersion`
-- [ ] `generator`
-- [ ] `copyright`
+- [x] `version`
+- [x] `minVersion`
+- [x] `generator`
+- [x] `copyright`
 
 ### Scenes & Nodes
 - [ ] Scenes
