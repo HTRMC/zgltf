@@ -55,25 +55,25 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 - [x] Morph target weights
 
 ### Materials (PBR Metallic-Roughness)
-- [ ] `baseColorFactor`
-- [ ] `baseColorTexture`
-- [ ] `metallicFactor` / `roughnessFactor`
-- [ ] `metallicRoughnessTexture`
-- [ ] `normalTexture` (with `scale`)
-- [ ] `occlusionTexture` (with `strength`)
-- [ ] `emissiveFactor`
-- [ ] `emissiveTexture`
-- [ ] Alpha mode `OPAQUE`
-- [ ] Alpha mode `MASK` (with `alphaCutoff`)
-- [ ] Alpha mode `BLEND`
-- [ ] `doubleSided`
+- [x] `baseColorFactor`
+- [x] `baseColorTexture`
+- [x] `metallicFactor` / `roughnessFactor`
+- [x] `metallicRoughnessTexture`
+- [x] `normalTexture` (with `scale`)
+- [x] `occlusionTexture` (with `strength`)
+- [x] `emissiveFactor`
+- [x] `emissiveTexture`
+- [x] Alpha mode `OPAQUE`
+- [x] Alpha mode `MASK` (with `alphaCutoff`)
+- [x] Alpha mode `BLEND`
+- [x] `doubleSided`
 
 ### Textures / Samplers / Images
-- [ ] Textures
-- [ ] Samplers — mag / min filter
-- [ ] Samplers — wrap S / T
-- [ ] Images — URI
-- [ ] Images — buffer view + `mimeType`
+- [x] Textures
+- [x] Samplers — mag / min filter
+- [x] Samplers — wrap S / T
+- [x] Images — URI
+- [x] Images — buffer view + `mimeType`
 - [ ] PNG decode
 - [ ] JPEG decode
 

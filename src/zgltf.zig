@@ -95,6 +95,66 @@ pub const Accessor = struct {
     name: ?[]const u8 = null,
 };
 
+pub const Image = struct {
+    uri: ?[]const u8 = null,
+    mimeType: ?[]const u8 = null,
+    bufferView: ?u32 = null,
+    name: ?[]const u8 = null,
+};
+
+pub const Sampler = struct {
+    magFilter: ?u32 = null,
+    minFilter: ?u32 = null,
+    wrapS: u32 = 10497,
+    wrapT: u32 = 10497,
+    name: ?[]const u8 = null,
+};
+
+pub const Texture = struct {
+    sampler: ?u32 = null,
+    source: ?u32 = null,
+    name: ?[]const u8 = null,
+};
+
+pub const TextureInfo = struct {
+    index: u32,
+    texCoord: u32 = 0,
+};
+
+pub const NormalTextureInfo = struct {
+    index: u32,
+    texCoord: u32 = 0,
+    scale: f32 = 1,
+};
+
+pub const OcclusionTextureInfo = struct {
+    index: u32,
+    texCoord: u32 = 0,
+    strength: f32 = 1,
+};
+
+pub const PbrMetallicRoughness = struct {
+    baseColorFactor: [4]f32 = .{ 1, 1, 1, 1 },
+    baseColorTexture: ?TextureInfo = null,
+    metallicFactor: f32 = 1,
+    roughnessFactor: f32 = 1,
+    metallicRoughnessTexture: ?TextureInfo = null,
+};
+
+pub const AlphaMode = enum { OPAQUE, MASK, BLEND };
+
+pub const Material = struct {
+    pbrMetallicRoughness: ?PbrMetallicRoughness = null,
+    normalTexture: ?NormalTextureInfo = null,
+    occlusionTexture: ?OcclusionTextureInfo = null,
+    emissiveTexture: ?TextureInfo = null,
+    emissiveFactor: [3]f32 = .{ 0, 0, 0 },
+    alphaMode: AlphaMode = .OPAQUE,
+    alphaCutoff: f32 = 0.5,
+    doubleSided: bool = false,
+    name: ?[]const u8 = null,
+};
+
 pub const PrimitiveMode = enum(u32) {
     points = 0,
     lines = 1,
@@ -157,6 +217,10 @@ pub const Gltf = struct {
     scenes: ?[]Scene = null,
     nodes: ?[]Node = null,
     meshes: ?[]Mesh = null,
+    materials: ?[]Material = null,
+    textures: ?[]Texture = null,
+    samplers: ?[]Sampler = null,
+    images: ?[]Image = null,
     buffers: ?[]Buffer = null,
     bufferViews: ?[]BufferView = null,
     accessors: ?[]Accessor = null,
@@ -338,6 +402,109 @@ test "mesh morph targets" {
     try testing.expectEqual(@as(usize, 2), m.primitives[0].targets.?.len);
     try testing.expectEqual(@as(u32, 1), m.primitives[0].targets.?[0].map.get("POSITION").?);
     try testing.expectEqualSlices(f32, &.{ 0.5, 0.25 }, m.weights.?);
+}
+
+test "material defaults" {
+    const json =
+        \\{"asset":{"version":"2.0"},"materials":[{}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const m = p.value.materials.?[0];
+    try testing.expectEqual([3]f32{ 0, 0, 0 }, m.emissiveFactor);
+    try testing.expectEqual(AlphaMode.OPAQUE, m.alphaMode);
+    try testing.expectEqual(@as(f32, 0.5), m.alphaCutoff);
+    try testing.expectEqual(false, m.doubleSided);
+    try testing.expectEqual(@as(?PbrMetallicRoughness, null), m.pbrMetallicRoughness);
+}
+
+test "material full pbr" {
+    const json =
+        \\{"asset":{"version":"2.0"},"materials":[{
+        \\  "pbrMetallicRoughness":{
+        \\    "baseColorFactor":[0.5,0.6,0.7,1.0],
+        \\    "baseColorTexture":{"index":0,"texCoord":1},
+        \\    "metallicFactor":0.0,
+        \\    "roughnessFactor":0.8,
+        \\    "metallicRoughnessTexture":{"index":1}},
+        \\  "normalTexture":{"index":2,"scale":2.0},
+        \\  "occlusionTexture":{"index":3,"strength":0.5},
+        \\  "emissiveTexture":{"index":4},
+        \\  "emissiveFactor":[1,0.5,0.25],
+        \\  "alphaMode":"BLEND",
+        \\  "alphaCutoff":0.25,
+        \\  "doubleSided":true}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const m = p.value.materials.?[0];
+    const pbr = m.pbrMetallicRoughness.?;
+    try testing.expectEqual([4]f32{ 0.5, 0.6, 0.7, 1.0 }, pbr.baseColorFactor);
+    try testing.expectEqual(@as(u32, 0), pbr.baseColorTexture.?.index);
+    try testing.expectEqual(@as(u32, 1), pbr.baseColorTexture.?.texCoord);
+    try testing.expectEqual(@as(f32, 0.0), pbr.metallicFactor);
+    try testing.expectEqual(@as(f32, 0.8), pbr.roughnessFactor);
+    try testing.expectEqual(@as(f32, 2.0), m.normalTexture.?.scale);
+    try testing.expectEqual(@as(f32, 0.5), m.occlusionTexture.?.strength);
+    try testing.expectEqual([3]f32{ 1, 0.5, 0.25 }, m.emissiveFactor);
+    try testing.expectEqual(AlphaMode.BLEND, m.alphaMode);
+    try testing.expectEqual(@as(f32, 0.25), m.alphaCutoff);
+    try testing.expectEqual(true, m.doubleSided);
+}
+
+test "alpha modes" {
+    inline for (.{ "OPAQUE", "MASK", "BLEND" }, .{ AlphaMode.OPAQUE, AlphaMode.MASK, AlphaMode.BLEND }) |s, want| {
+        const json = "{\"asset\":{\"version\":\"2.0\"},\"materials\":[{\"alphaMode\":\"" ++ s ++ "\"}]}";
+        var p = try parseSlice(testing.allocator, json);
+        defer p.deinit();
+        try testing.expectEqual(want, p.value.materials.?[0].alphaMode);
+    }
+}
+
+test "sampler defaults" {
+    const json =
+        \\{"asset":{"version":"2.0"},"samplers":[{}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const s = p.value.samplers.?[0];
+    try testing.expectEqual(@as(u32, 10497), s.wrapS);
+    try testing.expectEqual(@as(u32, 10497), s.wrapT);
+    try testing.expectEqual(@as(?u32, null), s.magFilter);
+}
+
+test "image bufferView" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "images":[{"bufferView":0,"mimeType":"image/png"}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const im = p.value.images.?[0];
+    try testing.expectEqual(@as(u32, 0), im.bufferView.?);
+    try testing.expectEqualStrings("image/png", im.mimeType.?);
+}
+
+test "parse BoxTextured sample" {
+    const bytes = try std.Io.Dir.cwd().readFileAlloc(
+        std.testing.io,
+        "test-assets/Models/BoxTextured/glTF/BoxTextured.gltf",
+        testing.allocator,
+        .unlimited,
+    );
+    defer testing.allocator.free(bytes);
+    var p = try parseSlice(testing.allocator, bytes);
+    defer p.deinit();
+    try testing.expectEqual(@as(usize, 1), p.value.materials.?.len);
+    const pbr = p.value.materials.?[0].pbrMetallicRoughness.?;
+    try testing.expectEqual(@as(u32, 0), pbr.baseColorTexture.?.index);
+    try testing.expectEqual(@as(f32, 0.0), pbr.metallicFactor);
+    try testing.expectEqual(@as(usize, 1), p.value.textures.?.len);
+    try testing.expectEqual(@as(u32, 0), p.value.textures.?[0].sampler.?);
+    try testing.expectEqual(@as(u32, 0), p.value.textures.?[0].source.?);
+    try testing.expectEqualStrings("CesiumLogoFlat.png", p.value.images.?[0].uri.?);
+    try testing.expectEqual(@as(?u32, 9729), p.value.samplers.?[0].magFilter);
+    try testing.expectEqual(@as(?u32, 9986), p.value.samplers.?[0].minFilter);
 }
 
 test "parse Triangle sample" {
