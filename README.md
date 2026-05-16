@@ -19,11 +19,11 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 - [x] `copyright`
 
 ### Scenes & Nodes
-- [ ] Scenes
-- [ ] Default scene
-- [ ] Node hierarchy
-- [ ] Node transforms — matrix
-- [ ] Node transforms — TRS (translation / rotation / scale)
+- [x] Scenes
+- [x] Default scene
+- [x] Node hierarchy
+- [x] Node transforms — matrix
+- [x] Node transforms — TRS (translation / rotation / scale)
 
 ### Buffers / Buffer Views / Accessors
 - [x] Buffers

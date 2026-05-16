@@ -95,8 +95,41 @@ pub const Accessor = struct {
     name: ?[]const u8 = null,
 };
 
+pub const Scene = struct {
+    nodes: ?[]u32 = null,
+    name: ?[]const u8 = null,
+};
+
+pub const Node = struct {
+    children: ?[]u32 = null,
+    mesh: ?u32 = null,
+    camera: ?u32 = null,
+    skin: ?u32 = null,
+    matrix: ?[16]f32 = null,
+    translation: ?[3]f32 = null,
+    rotation: ?[4]f32 = null,
+    scale: ?[3]f32 = null,
+    weights: ?[]f32 = null,
+    name: ?[]const u8 = null,
+
+    pub fn effectiveTranslation(self: Node) [3]f32 {
+        return self.translation orelse .{ 0, 0, 0 };
+    }
+
+    pub fn effectiveRotation(self: Node) [4]f32 {
+        return self.rotation orelse .{ 0, 0, 0, 1 };
+    }
+
+    pub fn effectiveScale(self: Node) [3]f32 {
+        return self.scale orelse .{ 1, 1, 1 };
+    }
+};
+
 pub const Gltf = struct {
     asset: Asset,
+    scene: ?u32 = null,
+    scenes: ?[]Scene = null,
+    nodes: ?[]Node = null,
     buffers: ?[]Buffer = null,
     bufferViews: ?[]BufferView = null,
     accessors: ?[]Accessor = null,
@@ -174,6 +207,63 @@ test "sparse accessor" {
     try testing.expectEqual(@as(u32, 1), s.values.bufferView);
 }
 
+test "node TRS defaults" {
+    const json =
+        \\{"asset":{"version":"2.0"},"nodes":[{}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const n = p.value.nodes.?[0];
+    try testing.expectEqual([3]f32{ 0, 0, 0 }, n.effectiveTranslation());
+    try testing.expectEqual([4]f32{ 0, 0, 0, 1 }, n.effectiveRotation());
+    try testing.expectEqual([3]f32{ 1, 1, 1 }, n.effectiveScale());
+    try testing.expectEqual(@as(?[16]f32, null), n.matrix);
+}
+
+test "node TRS explicit" {
+    const json =
+        \\{"asset":{"version":"2.0"},"nodes":[{
+        \\  "translation":[1,2,3],
+        \\  "rotation":[0,0,0.7071,0.7071],
+        \\  "scale":[2,2,2],
+        \\  "children":[1,2],
+        \\  "mesh":0}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const n = p.value.nodes.?[0];
+    try testing.expectEqual([3]f32{ 1, 2, 3 }, n.effectiveTranslation());
+    try testing.expectEqual([3]f32{ 2, 2, 2 }, n.effectiveScale());
+    try testing.expectEqual(@as(u32, 0), n.mesh.?);
+    try testing.expectEqualSlices(u32, &.{ 1, 2 }, n.children.?);
+}
+
+test "node matrix" {
+    const json =
+        \\{"asset":{"version":"2.0"},"nodes":[{
+        \\  "matrix":[1,0,0,0, 0,1,0,0, 0,0,1,0, 5,6,7,1]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const m = p.value.nodes.?[0].matrix.?;
+    try testing.expectEqual(@as(f32, 5), m[12]);
+    try testing.expectEqual(@as(f32, 6), m[13]);
+    try testing.expectEqual(@as(f32, 7), m[14]);
+}
+
+test "scenes" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "scene":0,
+        \\ "scenes":[{"nodes":[0,1],"name":"main"}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    try testing.expectEqual(@as(u32, 0), p.value.scene.?);
+    try testing.expectEqualSlices(u32, &.{ 0, 1 }, p.value.scenes.?[0].nodes.?);
+    try testing.expectEqualStrings("main", p.value.scenes.?[0].name.?);
+}
+
 test "parse Triangle sample" {
     const bytes = try std.Io.Dir.cwd().readFileAlloc(
         std.testing.io,
@@ -185,6 +275,10 @@ test "parse Triangle sample" {
     var p = try parseSlice(testing.allocator, bytes);
     defer p.deinit();
     try testing.expectEqualStrings("2.0", p.value.asset.version);
+    try testing.expectEqual(@as(u32, 0), p.value.scene.?);
+    try testing.expectEqual(@as(usize, 1), p.value.scenes.?.len);
+    try testing.expectEqualSlices(u32, &.{0}, p.value.scenes.?[0].nodes.?);
+    try testing.expectEqual(@as(u32, 0), p.value.nodes.?[0].mesh.?);
     try testing.expectEqual(@as(usize, 1), p.value.buffers.?.len);
     try testing.expectEqual(@as(u64, 44), p.value.buffers.?[0].byteLength);
     try testing.expectEqualStrings("Triangle.bin", p.value.buffers.?[0].uri.?);
