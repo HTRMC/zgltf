@@ -95,6 +95,62 @@ pub const Accessor = struct {
     name: ?[]const u8 = null,
 };
 
+pub const CameraKind = enum { perspective, orthographic };
+
+pub const PerspectiveCamera = struct {
+    aspectRatio: ?f32 = null,
+    yfov: f32,
+    zfar: ?f32 = null,
+    znear: f32,
+};
+
+pub const OrthographicCamera = struct {
+    xmag: f32,
+    ymag: f32,
+    zfar: f32,
+    znear: f32,
+};
+
+pub const Camera = struct {
+    type: CameraKind,
+    perspective: ?PerspectiveCamera = null,
+    orthographic: ?OrthographicCamera = null,
+    name: ?[]const u8 = null,
+};
+
+pub const Skin = struct {
+    inverseBindMatrices: ?u32 = null,
+    skeleton: ?u32 = null,
+    joints: []u32,
+    name: ?[]const u8 = null,
+};
+
+pub const Interpolation = enum { LINEAR, STEP, CUBICSPLINE };
+
+pub const AnimationPath = enum { translation, rotation, scale, weights };
+
+pub const AnimationTarget = struct {
+    node: ?u32 = null,
+    path: AnimationPath,
+};
+
+pub const AnimationChannel = struct {
+    sampler: u32,
+    target: AnimationTarget,
+};
+
+pub const AnimationSampler = struct {
+    input: u32,
+    output: u32,
+    interpolation: Interpolation = .LINEAR,
+};
+
+pub const Animation = struct {
+    channels: []AnimationChannel,
+    samplers: []AnimationSampler,
+    name: ?[]const u8 = null,
+};
+
 pub const Image = struct {
     uri: ?[]const u8 = null,
     mimeType: ?[]const u8 = null,
@@ -221,6 +277,9 @@ pub const Gltf = struct {
     textures: ?[]Texture = null,
     samplers: ?[]Sampler = null,
     images: ?[]Image = null,
+    cameras: ?[]Camera = null,
+    skins: ?[]Skin = null,
+    animations: ?[]Animation = null,
     buffers: ?[]Buffer = null,
     bufferViews: ?[]BufferView = null,
     accessors: ?[]Accessor = null,
@@ -505,6 +564,119 @@ test "parse BoxTextured sample" {
     try testing.expectEqualStrings("CesiumLogoFlat.png", p.value.images.?[0].uri.?);
     try testing.expectEqual(@as(?u32, 9729), p.value.samplers.?[0].magFilter);
     try testing.expectEqual(@as(?u32, 9986), p.value.samplers.?[0].minFilter);
+}
+
+test "perspective camera" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "cameras":[{"type":"perspective",
+        \\   "perspective":{"yfov":0.7,"znear":0.1,"zfar":1000,"aspectRatio":1.5}}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const c = p.value.cameras.?[0];
+    try testing.expectEqual(CameraKind.perspective, c.type);
+    const persp = c.perspective.?;
+    try testing.expectEqual(@as(f32, 0.7), persp.yfov);
+    try testing.expectEqual(@as(f32, 0.1), persp.znear);
+    try testing.expectEqual(@as(f32, 1000), persp.zfar.?);
+    try testing.expectEqual(@as(f32, 1.5), persp.aspectRatio.?);
+}
+
+test "orthographic camera" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "cameras":[{"type":"orthographic",
+        \\   "orthographic":{"xmag":2,"ymag":2,"zfar":100,"znear":0.1}}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const c = p.value.cameras.?[0];
+    try testing.expectEqual(CameraKind.orthographic, c.type);
+    const ortho = c.orthographic.?;
+    try testing.expectEqual(@as(f32, 2), ortho.xmag);
+    try testing.expectEqual(@as(f32, 100), ortho.zfar);
+}
+
+test "skin" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "skins":[{"inverseBindMatrices":0,"skeleton":1,"joints":[1,2,3]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const s = p.value.skins.?[0];
+    try testing.expectEqual(@as(u32, 0), s.inverseBindMatrices.?);
+    try testing.expectEqual(@as(u32, 1), s.skeleton.?);
+    try testing.expectEqualSlices(u32, &.{ 1, 2, 3 }, s.joints);
+}
+
+test "animation defaults" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "animations":[{
+        \\   "samplers":[{"input":0,"output":1}],
+        \\   "channels":[{"sampler":0,"target":{"node":0,"path":"translation"}}]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const a = p.value.animations.?[0];
+    try testing.expectEqual(Interpolation.LINEAR, a.samplers[0].interpolation);
+    try testing.expectEqual(AnimationPath.translation, a.channels[0].target.path);
+    try testing.expectEqual(@as(u32, 0), a.channels[0].target.node.?);
+}
+
+test "animation interpolations" {
+    inline for (.{ "LINEAR", "STEP", "CUBICSPLINE" }, .{ Interpolation.LINEAR, Interpolation.STEP, Interpolation.CUBICSPLINE }) |s, want| {
+        const json = "{\"asset\":{\"version\":\"2.0\"},\"animations\":[{" ++
+            "\"samplers\":[{\"input\":0,\"output\":1,\"interpolation\":\"" ++ s ++ "\"}]," ++
+            "\"channels\":[{\"sampler\":0,\"target\":{\"path\":\"weights\"}}]}]}";
+        var p = try parseSlice(testing.allocator, json);
+        defer p.deinit();
+        try testing.expectEqual(want, p.value.animations.?[0].samplers[0].interpolation);
+    }
+}
+
+test "animation target paths" {
+    inline for (.{ "translation", "rotation", "scale", "weights" }, .{ AnimationPath.translation, AnimationPath.rotation, AnimationPath.scale, AnimationPath.weights }) |s, want| {
+        const json = "{\"asset\":{\"version\":\"2.0\"},\"animations\":[{" ++
+            "\"samplers\":[{\"input\":0,\"output\":1}]," ++
+            "\"channels\":[{\"sampler\":0,\"target\":{\"path\":\"" ++ s ++ "\"}}]}]}";
+        var p = try parseSlice(testing.allocator, json);
+        defer p.deinit();
+        try testing.expectEqual(want, p.value.animations.?[0].channels[0].target.path);
+    }
+}
+
+test "parse AnimatedTriangle sample" {
+    const bytes = try std.Io.Dir.cwd().readFileAlloc(
+        std.testing.io,
+        "test-assets/Models/AnimatedTriangle/glTF/AnimatedTriangle.gltf",
+        testing.allocator,
+        .unlimited,
+    );
+    defer testing.allocator.free(bytes);
+    var p = try parseSlice(testing.allocator, bytes);
+    defer p.deinit();
+    const a = p.value.animations.?[0];
+    try testing.expectEqual(@as(usize, 1), a.samplers.len);
+    try testing.expectEqual(@as(usize, 1), a.channels.len);
+    try testing.expectEqual(AnimationPath.rotation, a.channels[0].target.path);
+    try testing.expectEqual(Interpolation.LINEAR, a.samplers[0].interpolation);
+}
+
+test "parse RiggedSimple sample" {
+    const bytes = try std.Io.Dir.cwd().readFileAlloc(
+        std.testing.io,
+        "test-assets/Models/RiggedSimple/glTF/RiggedSimple.gltf",
+        testing.allocator,
+        .unlimited,
+    );
+    defer testing.allocator.free(bytes);
+    var p = try parseSlice(testing.allocator, bytes);
+    defer p.deinit();
+    try testing.expect(p.value.skins.?.len >= 1);
+    try testing.expect(p.value.animations.?.len >= 1);
 }
 
 test "parse Triangle sample" {

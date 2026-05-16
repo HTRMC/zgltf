@@ -78,20 +78,20 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 - [ ] JPEG decode
 
 ### Cameras
-- [ ] Perspective
-- [ ] Orthographic
+- [x] Perspective
+- [x] Orthographic
 
 ### Skins & Animation
-- [ ] Skins (joints, `inverseBindMatrices`)
-- [ ] Animation channels
-- [ ] Animation samplers
-- [ ] Interpolation `LINEAR`
-- [ ] Interpolation `STEP`
-- [ ] Interpolation `CUBICSPLINE`
-- [ ] Target path `translation`
-- [ ] Target path `rotation`
-- [ ] Target path `scale`
-- [ ] Target path `weights`
+- [x] Skins (joints, `inverseBindMatrices`)
+- [x] Animation channels
+- [x] Animation samplers
+- [x] Interpolation `LINEAR`
+- [x] Interpolation `STEP`
+- [x] Interpolation `CUBICSPLINE`
+- [x] Target path `translation`
+- [x] Target path `rotation`
+- [x] Target path `scale`
+- [x] Target path `weights`
 
 ### Extensibility
 - [ ] `extensionsUsed`
