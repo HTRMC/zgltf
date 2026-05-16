@@ -26,13 +26,13 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 - [ ] Node transforms — TRS (translation / rotation / scale)
 
 ### Buffers / Buffer Views / Accessors
-- [ ] Buffers
-- [ ] Buffer views (with `byteStride`)
-- [ ] Accessors — all component types (`BYTE`, `UNSIGNED_BYTE`, `SHORT`, `UNSIGNED_SHORT`, `UNSIGNED_INT`, `FLOAT`)
-- [ ] Accessors — all element types (`SCALAR`, `VEC2`, `VEC3`, `VEC4`, `MAT2`, `MAT3`, `MAT4`)
-- [ ] Accessors — `normalized`
-- [ ] Accessors — `min` / `max`
-- [ ] Sparse accessors
+- [x] Buffers
+- [x] Buffer views (with `byteStride`)
+- [x] Accessors — all component types (`BYTE`, `UNSIGNED_BYTE`, `SHORT`, `UNSIGNED_SHORT`, `UNSIGNED_INT`, `FLOAT`)
+- [x] Accessors — all element types (`SCALAR`, `VEC2`, `VEC3`, `VEC4`, `MAT2`, `MAT3`, `MAT4`)
+- [x] Accessors — `normalized`
+- [x] Accessors — `min` / `max`
+- [x] Sparse accessors
 
 ### Meshes
 - [ ] Mesh primitives
