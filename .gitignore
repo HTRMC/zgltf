@@ -1,3 +1,4 @@
 /.omc
 /.zig-cache
 /zig-out
+/test-assets
