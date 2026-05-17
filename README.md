@@ -101,5 +101,5 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 
 ### Validation
 - [ ] JSON schema conformance
-- [ ] Reference resolution checks
-- [ ] Accessor bounds checks
+- [x] Reference resolution checks
+- [x] Accessor bounds checks

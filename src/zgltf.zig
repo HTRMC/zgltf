@@ -427,6 +427,142 @@ pub fn parseGlbSlice(allocator: std.mem.Allocator, bytes: []const u8) (GlbError 
     return .{ .parsed = parsed, .bin = glb.bin };
 }
 
+pub const ValidationError = error{
+    BadSceneRef,
+    BadNodeRef,
+    BadMeshRef,
+    BadCameraRef,
+    BadSkinRef,
+    BadAccessorRef,
+    BadBufferViewRef,
+    BadBufferRef,
+    BadMaterialRef,
+    BadTextureRef,
+    BadImageRef,
+    BadSamplerRef,
+    BadAnimationSamplerRef,
+    AccessorOutOfBounds,
+    BufferViewOutOfBounds,
+    UnknownAccessorComponentType,
+};
+
+fn countOf(opt: anytype) usize {
+    return if (opt) |s| s.len else 0;
+}
+
+fn checkIdx(idx: u32, n: usize, err: ValidationError) ValidationError!void {
+    if (idx >= n) return err;
+}
+
+fn elementSize(a: Accessor) ValidationError!u64 {
+    const ct: ComponentType = switch (a.componentType) {
+        5120 => .byte,
+        5121 => .unsigned_byte,
+        5122 => .short,
+        5123 => .unsigned_short,
+        5125 => .unsigned_int,
+        5126 => .float,
+        else => return error.UnknownAccessorComponentType,
+    };
+    return @as(u64, ct.byteSize()) * a.type.componentCount();
+}
+
+pub fn validate(g: *const Gltf) ValidationError!void {
+    const n_nodes = countOf(g.nodes);
+    const n_meshes = countOf(g.meshes);
+    const n_cameras = countOf(g.cameras);
+    const n_skins = countOf(g.skins);
+    const n_materials = countOf(g.materials);
+    const n_textures = countOf(g.textures);
+    const n_samplers = countOf(g.samplers);
+    const n_images = countOf(g.images);
+    const n_accessors = countOf(g.accessors);
+    const n_buffer_views = countOf(g.bufferViews);
+    const n_buffers = countOf(g.buffers);
+    const n_scenes = countOf(g.scenes);
+
+    if (g.scene) |s| try checkIdx(s, n_scenes, error.BadSceneRef);
+
+    if (g.scenes) |scenes| for (scenes) |sc| {
+        if (sc.nodes) |ns| for (ns) |i| try checkIdx(i, n_nodes, error.BadNodeRef);
+    };
+
+    if (g.nodes) |nodes| for (nodes) |nd| {
+        if (nd.children) |ch| for (ch) |i| try checkIdx(i, n_nodes, error.BadNodeRef);
+        if (nd.mesh) |i| try checkIdx(i, n_meshes, error.BadMeshRef);
+        if (nd.camera) |i| try checkIdx(i, n_cameras, error.BadCameraRef);
+        if (nd.skin) |i| try checkIdx(i, n_skins, error.BadSkinRef);
+    };
+
+    if (g.meshes) |meshes| for (meshes) |m| for (m.primitives) |prim| {
+        if (prim.indices) |i| try checkIdx(i, n_accessors, error.BadAccessorRef);
+        if (prim.material) |i| try checkIdx(i, n_materials, error.BadMaterialRef);
+        var it = prim.attributes.map.iterator();
+        while (it.next()) |kv| try checkIdx(kv.value_ptr.*, n_accessors, error.BadAccessorRef);
+        if (prim.targets) |ts| for (ts) |t| {
+            var tit = t.map.iterator();
+            while (tit.next()) |kv| try checkIdx(kv.value_ptr.*, n_accessors, error.BadAccessorRef);
+        };
+    };
+
+    if (g.materials) |mats| for (mats) |m| {
+        if (m.pbrMetallicRoughness) |pbr| {
+            if (pbr.baseColorTexture) |t| try checkIdx(t.index, n_textures, error.BadTextureRef);
+            if (pbr.metallicRoughnessTexture) |t| try checkIdx(t.index, n_textures, error.BadTextureRef);
+        }
+        if (m.normalTexture) |t| try checkIdx(t.index, n_textures, error.BadTextureRef);
+        if (m.occlusionTexture) |t| try checkIdx(t.index, n_textures, error.BadTextureRef);
+        if (m.emissiveTexture) |t| try checkIdx(t.index, n_textures, error.BadTextureRef);
+    };
+
+    if (g.textures) |txs| for (txs) |t| {
+        if (t.sampler) |i| try checkIdx(i, n_samplers, error.BadSamplerRef);
+        if (t.source) |i| try checkIdx(i, n_images, error.BadImageRef);
+    };
+
+    if (g.images) |imgs| for (imgs) |im| {
+        if (im.bufferView) |i| try checkIdx(i, n_buffer_views, error.BadBufferViewRef);
+    };
+
+    if (g.skins) |skins| for (skins) |sk| {
+        if (sk.skeleton) |i| try checkIdx(i, n_nodes, error.BadNodeRef);
+        if (sk.inverseBindMatrices) |i| try checkIdx(i, n_accessors, error.BadAccessorRef);
+        for (sk.joints) |j| try checkIdx(j, n_nodes, error.BadNodeRef);
+    };
+
+    if (g.animations) |anims| for (anims) |a| {
+        for (a.channels) |c| {
+            try checkIdx(c.sampler, @as(u32, @intCast(a.samplers.len)), error.BadAnimationSamplerRef);
+            if (c.target.node) |i| try checkIdx(i, n_nodes, error.BadNodeRef);
+        }
+        for (a.samplers) |s| {
+            try checkIdx(s.input, n_accessors, error.BadAccessorRef);
+            try checkIdx(s.output, n_accessors, error.BadAccessorRef);
+        }
+    };
+
+    if (g.bufferViews) |views| for (views) |v| {
+        try checkIdx(v.buffer, n_buffers, error.BadBufferRef);
+        const buf = g.buffers.?[v.buffer];
+        if (@as(u64, v.byteOffset) + v.byteLength > buf.byteLength) return error.BufferViewOutOfBounds;
+    };
+
+    if (g.accessors) |accs| for (accs) |a| {
+        const elem_size = try elementSize(a);
+        if (a.bufferView) |bvi| {
+            try checkIdx(bvi, n_buffer_views, error.BadBufferViewRef);
+            const bv = g.bufferViews.?[bvi];
+            const stride: u64 = if (bv.byteStride) |s| s else elem_size;
+            const end = @as(u64, a.byteOffset) + if (a.count == 0) 0 else (@as(u64, a.count - 1) * stride + elem_size);
+            if (end > bv.byteLength) return error.AccessorOutOfBounds;
+        }
+        if (a.sparse) |sp| {
+            try checkIdx(sp.indices.bufferView, n_buffer_views, error.BadBufferViewRef);
+            try checkIdx(sp.values.bufferView, n_buffer_views, error.BadBufferViewRef);
+        }
+    };
+}
+
 pub fn isDataUri(uri: []const u8) bool {
     return std.mem.startsWith(u8, uri, "data:");
 }
@@ -729,6 +865,73 @@ test "parse BoxTextured sample" {
     try testing.expectEqualStrings("CesiumLogoFlat.png", p.value.images.?[0].uri.?);
     try testing.expectEqual(@as(?u32, 9729), p.value.samplers.?[0].magFilter);
     try testing.expectEqual(@as(?u32, 9986), p.value.samplers.?[0].minFilter);
+}
+
+test "validate Triangle sample" {
+    const bytes = try std.Io.Dir.cwd().readFileAlloc(
+        std.testing.io,
+        "test-assets/Models/Triangle/glTF/Triangle.gltf",
+        testing.allocator,
+        .unlimited,
+    );
+    defer testing.allocator.free(bytes);
+    var p = try parseSlice(testing.allocator, bytes);
+    defer p.deinit();
+    try validate(&p.value);
+}
+
+test "validate BoxTextured sample" {
+    const bytes = try std.Io.Dir.cwd().readFileAlloc(
+        std.testing.io,
+        "test-assets/Models/BoxTextured/glTF/BoxTextured.gltf",
+        testing.allocator,
+        .unlimited,
+    );
+    defer testing.allocator.free(bytes);
+    var p = try parseSlice(testing.allocator, bytes);
+    defer p.deinit();
+    try validate(&p.value);
+}
+
+test "validate detects bad scene ref" {
+    const json =
+        \\{"asset":{"version":"2.0"},"scene":5,"scenes":[{"nodes":[]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    try testing.expectError(error.BadSceneRef, validate(&p.value));
+}
+
+test "validate detects bad mesh ref" {
+    const json =
+        \\{"asset":{"version":"2.0"},"nodes":[{"mesh":2}],"meshes":[{"primitives":[{"attributes":{}}]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    try testing.expectError(error.BadMeshRef, validate(&p.value));
+}
+
+test "validate detects accessor out of bounds" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "buffers":[{"byteLength":12}],
+        \\ "bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":12}],
+        \\ "accessors":[{"bufferView":0,"componentType":5126,"count":2,"type":"VEC3"}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    try testing.expectError(error.AccessorOutOfBounds, validate(&p.value));
+}
+
+test "validate detects bufferview out of bounds" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "buffers":[{"byteLength":10}],
+        \\ "bufferViews":[{"buffer":0,"byteOffset":4,"byteLength":20}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    try testing.expectError(error.BufferViewOutOfBounds, validate(&p.value));
 }
 
 test "extensionsUsed / extensionsRequired" {
