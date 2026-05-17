@@ -291,6 +291,77 @@ pub fn parseSlice(allocator: std.mem.Allocator, bytes: []const u8) ParseError!st
     return std.json.parseFromSlice(Gltf, allocator, bytes, .{ .ignore_unknown_fields = true });
 }
 
+pub const glb_magic: u32 = 0x46546C67;
+const json_chunk: u32 = 0x4E4F534A;
+const bin_chunk: u32 = 0x004E4942;
+
+pub const Glb = struct {
+    version: u32,
+    json: []const u8,
+    bin: ?[]const u8,
+};
+
+pub const GlbError = error{
+    Truncated,
+    BadMagic,
+    UnsupportedVersion,
+    MissingJsonChunk,
+    BadChunkLength,
+};
+
+pub fn parseGlb(bytes: []const u8) GlbError!Glb {
+    if (bytes.len < 12) return error.Truncated;
+    const magic = std.mem.readInt(u32, bytes[0..4], .little);
+    const version = std.mem.readInt(u32, bytes[4..8], .little);
+    const total = std.mem.readInt(u32, bytes[8..12], .little);
+    if (magic != glb_magic) return error.BadMagic;
+    if (version != 2) return error.UnsupportedVersion;
+    if (total > bytes.len) return error.Truncated;
+
+    var off: usize = 12;
+    if (off + 8 > total) return error.MissingJsonChunk;
+    const c0_len = std.mem.readInt(u32, bytes[off..][0..4], .little);
+    const c0_type = std.mem.readInt(u32, bytes[off + 4 ..][0..4], .little);
+    off += 8;
+    if (c0_type != json_chunk) return error.MissingJsonChunk;
+    if (off + c0_len > total) return error.BadChunkLength;
+    const json_bytes = bytes[off .. off + c0_len];
+    off += c0_len;
+
+    var bin_bytes: ?[]const u8 = null;
+    if (off < total) {
+        if (off + 8 > total) return error.BadChunkLength;
+        const c1_len = std.mem.readInt(u32, bytes[off..][0..4], .little);
+        const c1_type = std.mem.readInt(u32, bytes[off + 4 ..][0..4], .little);
+        off += 8;
+        if (c1_type == bin_chunk) {
+            if (off + c1_len > total) return error.BadChunkLength;
+            bin_bytes = bytes[off .. off + c1_len];
+        }
+    }
+
+    return .{ .version = version, .json = json_bytes, .bin = bin_bytes };
+}
+
+pub const LoadedGlb = struct {
+    parsed: std.json.Parsed(Gltf),
+    bin: ?[]const u8,
+
+    pub fn deinit(self: *LoadedGlb) void {
+        self.parsed.deinit();
+    }
+
+    pub fn value(self: *const LoadedGlb) *const Gltf {
+        return &self.parsed.value;
+    }
+};
+
+pub fn parseGlbSlice(allocator: std.mem.Allocator, bytes: []const u8) (GlbError || ParseError)!LoadedGlb {
+    const glb = try parseGlb(bytes);
+    const parsed = try parseSlice(allocator, glb.json);
+    return .{ .parsed = parsed, .bin = glb.bin };
+}
+
 const testing = std.testing;
 
 test "asset only" {
@@ -564,6 +635,31 @@ test "parse BoxTextured sample" {
     try testing.expectEqualStrings("CesiumLogoFlat.png", p.value.images.?[0].uri.?);
     try testing.expectEqual(@as(?u32, 9729), p.value.samplers.?[0].magFilter);
     try testing.expectEqual(@as(?u32, 9986), p.value.samplers.?[0].minFilter);
+}
+
+test "glb bad magic" {
+    const bytes = [_]u8{0} ** 12;
+    try testing.expectError(error.BadMagic, parseGlb(&bytes));
+}
+
+test "glb truncated" {
+    const bytes = [_]u8{0} ** 8;
+    try testing.expectError(error.Truncated, parseGlb(&bytes));
+}
+
+test "parse Box.glb" {
+    const bytes = try std.Io.Dir.cwd().readFileAlloc(
+        std.testing.io,
+        "test-assets/Models/Box/glTF-Binary/Box.glb",
+        testing.allocator,
+        .unlimited,
+    );
+    defer testing.allocator.free(bytes);
+    var loaded = try parseGlbSlice(testing.allocator, bytes);
+    defer loaded.deinit();
+    try testing.expectEqualStrings("2.0", loaded.value().asset.version);
+    try testing.expect(loaded.bin != null);
+    try testing.expect(loaded.value().meshes.?.len >= 1);
 }
 
 test "perspective camera" {

@@ -7,8 +7,8 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 ## Feature Checklist
 
 ### Container Formats
-- [ ] `.gltf` (JSON)
-- [ ] `.glb` (binary container)
+- [x] `.gltf` (JSON)
+- [x] `.glb` (binary container)
 - [ ] External buffer / image files
 - [ ] Embedded base64 data URIs
 
