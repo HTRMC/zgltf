@@ -15,11 +15,11 @@ pub const DecodedImage = struct {
     }
 };
 
-pub const ImageDecoder = struct {
+pub const Decoder = struct {
     ctx: ?*anyopaque = null,
     decodeFn: *const fn (ctx: ?*anyopaque, allocator: std.mem.Allocator, bytes: []const u8) DecodeError!DecodedImage,
 
-    pub fn decode(self: ImageDecoder, allocator: std.mem.Allocator, bytes: []const u8) DecodeError!DecodedImage {
+    pub fn decode(self: Decoder, allocator: std.mem.Allocator, bytes: []const u8) DecodeError!DecodedImage {
         return self.decodeFn(self.ctx, allocator, bytes);
     }
 };

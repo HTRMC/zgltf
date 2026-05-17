@@ -31,7 +31,7 @@ fn decode(_: ?*anyopaque, _: std.mem.Allocator, bytes: []const u8) image.DecodeE
     };
 }
 
-pub const decoder: image.ImageDecoder = .{ .decodeFn = decode };
+pub const decoder: image.Decoder = .{ .decodeFn = decode };
 
 const testing = std.testing;
 

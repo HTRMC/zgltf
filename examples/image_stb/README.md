@@ -47,7 +47,7 @@ zig build examples-test       # runs decoder tests
 The decoder contract lives in `src/image.zig`:
 
 ```zig
-pub const ImageDecoder = struct {
+pub const Decoder = struct {
     ctx: ?*anyopaque = null,
     decodeFn: *const fn (ctx: ?*anyopaque, allocator: std.mem.Allocator, bytes: []const u8) DecodeError!DecodedImage,
 };
