@@ -1,10 +1,15 @@
 const std = @import("std");
 
+pub const Extras = std.json.Value;
+pub const Extensions = std.json.ArrayHashMap(std.json.Value);
+
 pub const Asset = struct {
     version: []const u8,
     minVersion: ?[]const u8 = null,
     generator: ?[]const u8 = null,
     copyright: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const ComponentType = enum(u32) {
@@ -54,6 +59,8 @@ pub const Buffer = struct {
     byteLength: u64,
     uri: ?[]const u8 = null,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const BufferView = struct {
@@ -63,23 +70,31 @@ pub const BufferView = struct {
     byteStride: ?u32 = null,
     target: ?u32 = null,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const SparseIndices = struct {
     bufferView: u32,
     byteOffset: u32 = 0,
     componentType: u32,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const SparseValues = struct {
     bufferView: u32,
     byteOffset: u32 = 0,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Sparse = struct {
     count: u32,
     indices: SparseIndices,
     values: SparseValues,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Accessor = struct {
@@ -93,6 +108,8 @@ pub const Accessor = struct {
     min: ?[]f64 = null,
     sparse: ?Sparse = null,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const CameraKind = enum { perspective, orthographic };
@@ -102,6 +119,8 @@ pub const PerspectiveCamera = struct {
     yfov: f32,
     zfar: ?f32 = null,
     znear: f32,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const OrthographicCamera = struct {
@@ -109,6 +128,8 @@ pub const OrthographicCamera = struct {
     ymag: f32,
     zfar: f32,
     znear: f32,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Camera = struct {
@@ -116,6 +137,8 @@ pub const Camera = struct {
     perspective: ?PerspectiveCamera = null,
     orthographic: ?OrthographicCamera = null,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Skin = struct {
@@ -123,6 +146,8 @@ pub const Skin = struct {
     skeleton: ?u32 = null,
     joints: []u32,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Interpolation = enum { LINEAR, STEP, CUBICSPLINE };
@@ -132,6 +157,8 @@ pub const AnimationPathCore = enum { translation, rotation, scale, weights };
 pub const AnimationTarget = struct {
     node: ?u32 = null,
     path: []const u8,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 
     pub fn coreKind(self: AnimationTarget) ?AnimationPathCore {
         return std.meta.stringToEnum(AnimationPathCore, self.path);
@@ -141,18 +168,24 @@ pub const AnimationTarget = struct {
 pub const AnimationChannel = struct {
     sampler: u32,
     target: AnimationTarget,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const AnimationSampler = struct {
     input: u32,
     output: u32,
     interpolation: Interpolation = .LINEAR,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Animation = struct {
     channels: []AnimationChannel,
     samplers: []AnimationSampler,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Image = struct {
@@ -160,6 +193,8 @@ pub const Image = struct {
     mimeType: ?[]const u8 = null,
     bufferView: ?u32 = null,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Sampler = struct {
@@ -168,29 +203,39 @@ pub const Sampler = struct {
     wrapS: u32 = 10497,
     wrapT: u32 = 10497,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Texture = struct {
     sampler: ?u32 = null,
     source: ?u32 = null,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const TextureInfo = struct {
     index: u32,
     texCoord: u32 = 0,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const NormalTextureInfo = struct {
     index: u32,
     texCoord: u32 = 0,
     scale: f32 = 1,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const OcclusionTextureInfo = struct {
     index: u32,
     texCoord: u32 = 0,
     strength: f32 = 1,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const PbrMetallicRoughness = struct {
@@ -199,6 +244,8 @@ pub const PbrMetallicRoughness = struct {
     metallicFactor: f32 = 1,
     roughnessFactor: f32 = 1,
     metallicRoughnessTexture: ?TextureInfo = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const AlphaMode = enum { OPAQUE, MASK, BLEND };
@@ -213,6 +260,8 @@ pub const Material = struct {
     alphaCutoff: f32 = 0.5,
     doubleSided: bool = false,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const PrimitiveMode = enum(u32) {
@@ -233,17 +282,23 @@ pub const Primitive = struct {
     material: ?u32 = null,
     mode: u32 = @intFromEnum(PrimitiveMode.triangles),
     targets: ?[]Attributes = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Mesh = struct {
     primitives: []Primitive,
     weights: ?[]f32 = null,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Scene = struct {
     nodes: ?[]u32 = null,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const Node = struct {
@@ -257,6 +312,8 @@ pub const Node = struct {
     scale: ?[3]f32 = null,
     weights: ?[]f32 = null,
     name: ?[]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 
     pub fn effectiveTranslation(self: Node) [3]f32 {
         return self.translation orelse .{ 0, 0, 0 };
@@ -287,6 +344,10 @@ pub const Gltf = struct {
     buffers: ?[]Buffer = null,
     bufferViews: ?[]BufferView = null,
     accessors: ?[]Accessor = null,
+    extensionsUsed: ?[][]const u8 = null,
+    extensionsRequired: ?[][]const u8 = null,
+    extensions: ?Extensions = null,
+    extras: ?Extras = null,
 };
 
 pub const ParseError = std.json.ParseError(std.json.Scanner);
@@ -668,6 +729,44 @@ test "parse BoxTextured sample" {
     try testing.expectEqualStrings("CesiumLogoFlat.png", p.value.images.?[0].uri.?);
     try testing.expectEqual(@as(?u32, 9729), p.value.samplers.?[0].magFilter);
     try testing.expectEqual(@as(?u32, 9986), p.value.samplers.?[0].minFilter);
+}
+
+test "extensionsUsed / extensionsRequired" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "extensionsUsed":["KHR_animation_pointer","KHR_lights_punctual"],
+        \\ "extensionsRequired":["KHR_animation_pointer"]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    try testing.expectEqual(@as(usize, 2), p.value.extensionsUsed.?.len);
+    try testing.expectEqualStrings("KHR_animation_pointer", p.value.extensionsUsed.?[0]);
+    try testing.expectEqualStrings("KHR_lights_punctual", p.value.extensionsUsed.?[1]);
+    try testing.expectEqualStrings("KHR_animation_pointer", p.value.extensionsRequired.?[0]);
+}
+
+test "extensions passthrough" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "nodes":[{"extensions":{"KHR_lights_punctual":{"light":3}}}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const ext = p.value.nodes.?[0].extensions.?;
+    const v = ext.map.get("KHR_lights_punctual").?;
+    const light = v.object.get("light").?;
+    try testing.expectEqual(@as(i64, 3), light.integer);
+}
+
+test "extras passthrough" {
+    const json =
+        \\{"asset":{"version":"2.0","extras":{"note":"hello","count":42}}}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const x = p.value.asset.extras.?;
+    try testing.expectEqualStrings("hello", x.object.get("note").?.string);
+    try testing.expectEqual(@as(i64, 42), x.object.get("count").?.integer);
 }
 
 test "decode data uri" {

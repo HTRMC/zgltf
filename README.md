@@ -94,10 +94,10 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 - [x] Target path `weights`
 
 ### Extensibility
-- [ ] `extensionsUsed`
-- [ ] `extensionsRequired`
-- [ ] `extensions` passthrough
-- [ ] `extras` passthrough
+- [x] `extensionsUsed`
+- [x] `extensionsRequired`
+- [x] `extensions` passthrough
+- [x] `extras` passthrough
 
 ### Validation
 - [ ] JSON schema conformance
