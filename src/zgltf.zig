@@ -1,5 +1,7 @@
 const std = @import("std");
 
+pub const image = @import("image.zig");
+
 pub const Extras = std.json.Value;
 pub const Extensions = std.json.ArrayHashMap(std.json.Value);
 
