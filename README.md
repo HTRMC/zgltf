@@ -9,8 +9,8 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 ### Container Formats
 - [x] `.gltf` (JSON)
 - [x] `.glb` (binary container)
-- [ ] External buffer / image files
-- [ ] Embedded base64 data URIs
+- [x] External buffer / image files
+- [x] Embedded base64 data URIs
 
 ### Asset
 - [x] `version`

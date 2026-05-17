@@ -362,6 +362,35 @@ pub fn parseGlbSlice(allocator: std.mem.Allocator, bytes: []const u8) (GlbError 
     return .{ .parsed = parsed, .bin = glb.bin };
 }
 
+pub fn isDataUri(uri: []const u8) bool {
+    return std.mem.startsWith(u8, uri, "data:");
+}
+
+pub const DataUriError = error{ MalformedDataUri, InvalidBase64 } || std.mem.Allocator.Error;
+
+pub fn decodeDataUri(allocator: std.mem.Allocator, uri: []const u8) DataUriError![]u8 {
+    const marker = ";base64,";
+    const idx = std.mem.indexOf(u8, uri, marker) orelse return error.MalformedDataUri;
+    const b64 = uri[idx + marker.len ..];
+    const decoded_len = std.base64.standard.Decoder.calcSizeForSlice(b64) catch return error.InvalidBase64;
+    const out = try allocator.alloc(u8, decoded_len);
+    errdefer allocator.free(out);
+    std.base64.standard.Decoder.decode(out, b64) catch return error.InvalidBase64;
+    return out;
+}
+
+pub const LoadUriError = DataUriError || std.Io.Dir.ReadFileAllocError;
+
+pub fn loadUri(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    base_dir: std.Io.Dir,
+    uri: []const u8,
+) LoadUriError![]u8 {
+    if (isDataUri(uri)) return decodeDataUri(allocator, uri);
+    return base_dir.readFileAlloc(io, uri, allocator, .unlimited);
+}
+
 const testing = std.testing;
 
 test "asset only" {
@@ -635,6 +664,48 @@ test "parse BoxTextured sample" {
     try testing.expectEqualStrings("CesiumLogoFlat.png", p.value.images.?[0].uri.?);
     try testing.expectEqual(@as(?u32, 9729), p.value.samplers.?[0].magFilter);
     try testing.expectEqual(@as(?u32, 9986), p.value.samplers.?[0].minFilter);
+}
+
+test "decode data uri" {
+    const uri = "data:application/octet-stream;base64,aGVsbG8=";
+    const bytes = try decodeDataUri(testing.allocator, uri);
+    defer testing.allocator.free(bytes);
+    try testing.expectEqualStrings("hello", bytes);
+}
+
+test "data uri detection" {
+    try testing.expect(isDataUri("data:foo;base64,xx"));
+    try testing.expect(!isDataUri("Triangle.bin"));
+    try testing.expect(!isDataUri(""));
+}
+
+test "data uri malformed" {
+    try testing.expectError(error.MalformedDataUri, decodeDataUri(testing.allocator, "data:foo,nope"));
+}
+
+test "load embedded buffer" {
+    const bytes = try std.Io.Dir.cwd().readFileAlloc(
+        std.testing.io,
+        "test-assets/Models/Box/glTF-Embedded/Box.gltf",
+        testing.allocator,
+        .unlimited,
+    );
+    defer testing.allocator.free(bytes);
+    var p = try parseSlice(testing.allocator, bytes);
+    defer p.deinit();
+    const buf = p.value.buffers.?[0];
+    try testing.expect(isDataUri(buf.uri.?));
+    const data = try decodeDataUri(testing.allocator, buf.uri.?);
+    defer testing.allocator.free(data);
+    try testing.expectEqual(@as(usize, buf.byteLength), data.len);
+}
+
+test "load external buffer" {
+    var dir = try std.Io.Dir.cwd().openDir(std.testing.io, "test-assets/Models/Triangle/glTF", .{});
+    defer dir.close(std.testing.io);
+    const data = try loadUri(testing.allocator, std.testing.io, dir, "Triangle.bin");
+    defer testing.allocator.free(data);
+    try testing.expectEqual(@as(usize, 44), data.len);
 }
 
 test "glb bad magic" {
