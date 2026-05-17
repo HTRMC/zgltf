@@ -21,6 +21,13 @@ pub fn build(b: *std.Build) void {
     stb_mod.addIncludePath(stb_dep.path(""));
     stb_mod.addCSourceFile(.{ .file = b.path("src/stb_image_impl.c"), .flags = &.{} });
 
+    const khr_mod = b.addModule("zgltf_khr", .{
+        .root_source_file = b.path("src/khr.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    khr_mod.addImport("zgltf", mod);
+
     const exe = b.addExecutable(.{
         .name = "zgltf",
         .root_module = b.createModule(.{
@@ -51,7 +58,11 @@ pub fn build(b: *std.Build) void {
     const stb_tests = b.addTest(.{ .root_module = stb_mod });
     const run_stb_tests = b.addRunArtifact(stb_tests);
 
+    const khr_tests = b.addTest(.{ .root_module = khr_mod });
+    const run_khr_tests = b.addRunArtifact(khr_tests);
+
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_stb_tests.step);
+    test_step.dependOn(&run_khr_tests.step);
 }

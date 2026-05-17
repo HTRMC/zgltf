@@ -587,6 +587,17 @@ pub fn validate(g: *const Gltf) ValidationError!void {
     };
 }
 
+pub fn getTypedExtension(
+    comptime T: type,
+    allocator: std.mem.Allocator,
+    container: ?Extensions,
+    name: []const u8,
+) !?std.json.Parsed(T) {
+    const ext = container orelse return null;
+    const value = ext.map.get(name) orelse return null;
+    return try std.json.parseFromValue(T, allocator, value, .{ .ignore_unknown_fields = true });
+}
+
 pub fn isDataUri(uri: []const u8) bool {
     return std.mem.startsWith(u8, uri, "data:");
 }

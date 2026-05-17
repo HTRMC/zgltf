@@ -98,6 +98,8 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 - [x] `extensionsRequired`
 - [x] `extensions` passthrough
 - [x] `extras` passthrough
+- [x] Typed extension access via `getTypedExtension(comptime T, ...)`
+- [x] Optional `zgltf_khr` submodule with typed structs for all Khronos-ratified extensions: `KHR_lights_punctual`, `KHR_materials_unlit`/`clearcoat`/`emissive_strength`/`ior`/`transmission`/`volume`/`specular`/`sheen`/`anisotropy`/`iridescence`/`dispersion`/`variants`, `KHR_texture_transform`/`basisu`, `KHR_draco_mesh_compression`, `KHR_mesh_quantization`, `KHR_xmp_json_ld`, `KHR_animation_pointer`
 
 ### Validation
 - [x] JSON schema conformance (required fields, non-empty arrays, camera-block match, min/max length)
