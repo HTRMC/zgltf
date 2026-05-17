@@ -100,6 +100,6 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 - [x] `extras` passthrough
 
 ### Validation
-- [ ] JSON schema conformance
+- [x] JSON schema conformance (required fields, non-empty arrays, camera-block match, min/max length)
 - [x] Reference resolution checks
 - [x] Accessor bounds checks

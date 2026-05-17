@@ -446,6 +446,13 @@ pub const ValidationError = error{
     AccessorOutOfBounds,
     BufferViewOutOfBounds,
     UnknownAccessorComponentType,
+    EmptyPrimitives,
+    EmptyJoints,
+    EmptyAnimationChannels,
+    EmptyAnimationSamplers,
+    CameraMissingBlock,
+    AccessorMinMaxLengthMismatch,
+    BadCameraKind,
 };
 
 fn countOf(opt: anytype) usize {
@@ -496,6 +503,10 @@ pub fn validate(g: *const Gltf) ValidationError!void {
         if (nd.skin) |i| try checkIdx(i, n_skins, error.BadSkinRef);
     };
 
+    if (g.meshes) |meshes| for (meshes) |m| {
+        if (m.primitives.len == 0) return error.EmptyPrimitives;
+    };
+
     if (g.meshes) |meshes| for (meshes) |m| for (m.primitives) |prim| {
         if (prim.indices) |i| try checkIdx(i, n_accessors, error.BadAccessorRef);
         if (prim.material) |i| try checkIdx(i, n_materials, error.BadMaterialRef);
@@ -527,12 +538,20 @@ pub fn validate(g: *const Gltf) ValidationError!void {
     };
 
     if (g.skins) |skins| for (skins) |sk| {
+        if (sk.joints.len == 0) return error.EmptyJoints;
         if (sk.skeleton) |i| try checkIdx(i, n_nodes, error.BadNodeRef);
         if (sk.inverseBindMatrices) |i| try checkIdx(i, n_accessors, error.BadAccessorRef);
         for (sk.joints) |j| try checkIdx(j, n_nodes, error.BadNodeRef);
     };
 
+    if (g.cameras) |cams| for (cams) |cam| switch (cam.type) {
+        .perspective => if (cam.perspective == null) return error.CameraMissingBlock,
+        .orthographic => if (cam.orthographic == null) return error.CameraMissingBlock,
+    };
+
     if (g.animations) |anims| for (anims) |a| {
+        if (a.channels.len == 0) return error.EmptyAnimationChannels;
+        if (a.samplers.len == 0) return error.EmptyAnimationSamplers;
         for (a.channels) |c| {
             try checkIdx(c.sampler, @as(u32, @intCast(a.samplers.len)), error.BadAnimationSamplerRef);
             if (c.target.node) |i| try checkIdx(i, n_nodes, error.BadNodeRef);
@@ -551,6 +570,9 @@ pub fn validate(g: *const Gltf) ValidationError!void {
 
     if (g.accessors) |accs| for (accs) |a| {
         const elem_size = try elementSize(a);
+        const ncomp = a.type.componentCount();
+        if (a.min) |m| if (m.len != ncomp) return error.AccessorMinMaxLengthMismatch;
+        if (a.max) |m| if (m.len != ncomp) return error.AccessorMinMaxLengthMismatch;
         if (a.bufferView) |bvi| {
             try checkIdx(bvi, n_buffer_views, error.BadBufferViewRef);
             const bv = g.bufferViews.?[bvi];
@@ -893,6 +915,45 @@ test "validate BoxTextured sample" {
     var p = try parseSlice(testing.allocator, bytes);
     defer p.deinit();
     try validate(&p.value);
+}
+
+test "validate detects empty primitives" {
+    const json =
+        \\{"asset":{"version":"2.0"},"meshes":[{"primitives":[]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    try testing.expectError(error.EmptyPrimitives, validate(&p.value));
+}
+
+test "validate detects empty joints" {
+    const json =
+        \\{"asset":{"version":"2.0"},"skins":[{"joints":[]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    try testing.expectError(error.EmptyJoints, validate(&p.value));
+}
+
+test "validate detects camera missing block" {
+    const json =
+        \\{"asset":{"version":"2.0"},"cameras":[{"type":"perspective"}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    try testing.expectError(error.CameraMissingBlock, validate(&p.value));
+}
+
+test "validate detects min/max length mismatch" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "buffers":[{"byteLength":36}],
+        \\ "bufferViews":[{"buffer":0,"byteLength":36}],
+        \\ "accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    try testing.expectError(error.AccessorMinMaxLengthMismatch, validate(&p.value));
 }
 
 test "validate detects bad scene ref" {
