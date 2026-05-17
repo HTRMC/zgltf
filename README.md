@@ -74,8 +74,8 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 - [x] Samplers — wrap S / T
 - [x] Images — URI
 - [x] Images — buffer view + `mimeType`
-- [x] PNG decode (via pluggable `ImageDecoder`; default backend = stb_image)
-- [x] JPEG decode (via pluggable `ImageDecoder`; default backend = stb_image)
+- [x] PNG decode (via pluggable `ImageDecoder`; reference backend in `examples/image_stb`)
+- [x] JPEG decode (via pluggable `ImageDecoder`; reference backend in `examples/image_stb`)
 
 ### Cameras
 - [x] Perspective
