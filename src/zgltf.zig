@@ -127,11 +127,15 @@ pub const Skin = struct {
 
 pub const Interpolation = enum { LINEAR, STEP, CUBICSPLINE };
 
-pub const AnimationPath = enum { translation, rotation, scale, weights };
+pub const AnimationPathCore = enum { translation, rotation, scale, weights };
 
 pub const AnimationTarget = struct {
     node: ?u32 = null,
-    path: AnimationPath,
+    path: []const u8,
+
+    pub fn coreKind(self: AnimationTarget) ?AnimationPathCore {
+        return std.meta.stringToEnum(AnimationPathCore, self.path);
+    }
 };
 
 pub const AnimationChannel = struct {
@@ -789,7 +793,8 @@ test "animation defaults" {
     defer p.deinit();
     const a = p.value.animations.?[0];
     try testing.expectEqual(Interpolation.LINEAR, a.samplers[0].interpolation);
-    try testing.expectEqual(AnimationPath.translation, a.channels[0].target.path);
+    try testing.expectEqualStrings("translation", a.channels[0].target.path);
+    try testing.expectEqual(AnimationPathCore.translation, a.channels[0].target.coreKind().?);
     try testing.expectEqual(@as(u32, 0), a.channels[0].target.node.?);
 }
 
@@ -805,14 +810,30 @@ test "animation interpolations" {
 }
 
 test "animation target paths" {
-    inline for (.{ "translation", "rotation", "scale", "weights" }, .{ AnimationPath.translation, AnimationPath.rotation, AnimationPath.scale, AnimationPath.weights }) |s, want| {
+    inline for (.{ "translation", "rotation", "scale", "weights" }, .{ AnimationPathCore.translation, AnimationPathCore.rotation, AnimationPathCore.scale, AnimationPathCore.weights }) |s, want| {
         const json = "{\"asset\":{\"version\":\"2.0\"},\"animations\":[{" ++
             "\"samplers\":[{\"input\":0,\"output\":1}]," ++
             "\"channels\":[{\"sampler\":0,\"target\":{\"path\":\"" ++ s ++ "\"}}]}]}";
         var p = try parseSlice(testing.allocator, json);
         defer p.deinit();
-        try testing.expectEqual(want, p.value.animations.?[0].channels[0].target.path);
+        const t = p.value.animations.?[0].channels[0].target;
+        try testing.expectEqualStrings(s, t.path);
+        try testing.expectEqual(want, t.coreKind().?);
     }
+}
+
+test "animation extension path accepted" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "animations":[{
+        \\   "samplers":[{"input":0,"output":1}],
+        \\   "channels":[{"sampler":0,"target":{"path":"pointer"}}]}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const t = p.value.animations.?[0].channels[0].target;
+    try testing.expectEqualStrings("pointer", t.path);
+    try testing.expectEqual(@as(?AnimationPathCore, null), t.coreKind());
 }
 
 test "parse AnimatedTriangle sample" {
@@ -828,7 +849,7 @@ test "parse AnimatedTriangle sample" {
     const a = p.value.animations.?[0];
     try testing.expectEqual(@as(usize, 1), a.samplers.len);
     try testing.expectEqual(@as(usize, 1), a.channels.len);
-    try testing.expectEqual(AnimationPath.rotation, a.channels[0].target.path);
+    try testing.expectEqualStrings("rotation", a.channels[0].target.path);
     try testing.expectEqual(Interpolation.LINEAR, a.samplers[0].interpolation);
 }
 
