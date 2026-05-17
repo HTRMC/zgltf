@@ -4,6 +4,11 @@ Zig library for the [glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-
 
 **Goal:** full Core glTF 2.0 feature coverage.
 
+## Example Project
+> **NOTE:** This example project was created with the help of [Claude Code](https://claude.com/claude-code).
+
+[zgltf-vulkan](https://github.com/HTRMC/zgltf-vulkan) glTF 2.0 viewer in Zig + Vulkan using this library. Demonstrates .gltf / .glb loading, PBR metallic-roughness, skinning, animations, and KHR extensions (materials_specular, sheen, iridescence, anisotropy, transmission, volume, lights_punctual).
+
 ## Feature Checklist
 
 ### Container Formats
