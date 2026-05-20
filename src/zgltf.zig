@@ -113,7 +113,7 @@ pub const Accessor = struct {
     extensions: ?Extensions = null,
     extras: ?Extras = null,
 
-    pub fn elementSize(a: *@This()) ValidationError!u64 {
+    pub fn elementSize(a: *const @This()) ValidationError!u64 {
         const ct: ComponentType = switch (a.componentType) {
             5120 => .byte,
             5121 => .unsigned_byte,
@@ -569,7 +569,7 @@ pub fn validate(g: *const Gltf) ValidationError!void {
     };
 
     if (g.accessors) |accs| for (accs) |a| {
-        const elem_size = try elementSize(a);
+        const elem_size = try a.elementSize();
         const ncomp = a.type.componentCount();
         if (a.min) |m| if (m.len != ncomp) return error.AccessorMinMaxLengthMismatch;
         if (a.max) |m| if (m.len != ncomp) return error.AccessorMinMaxLengthMismatch;
