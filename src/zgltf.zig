@@ -125,11 +125,84 @@ pub const Accessor = struct {
     extensions: ?Extensions = null,
     extras: ?Extras = null,
 
-    pub fn elementSize(a: *const @This()) ValidationError!u64 {
+    pub fn elementSize(a: *const @This()) error{UnknownAccessorComponentType}!u64 {
         const ct = try ComponentType.fromInt(a.componentType);
         return @as(u64, ct.byteSize()) * a.type.componentCount();
     }
+
+    pub fn bytes(a: *const @This(), gltf: *const Gltf, buffers: []const []const u8) AccessorReadError![]const u8 {
+        if (a.sparse != null) return error.SparseNotSupported;
+        const bv_idx = a.bufferView orelse return error.NoBufferView;
+        const bvs = gltf.bufferViews orelse return error.BadBufferViewRef;
+        if (bv_idx >= bvs.len) return error.BadBufferViewRef;
+        const bv = bvs[bv_idx];
+        if (bv.buffer >= buffers.len) return error.BufferIndexOutOfBounds;
+        const buf = buffers[bv.buffer];
+        const elem = try a.elementSize();
+        const stride: u64 = if (bv.byteStride) |s| s else elem;
+        const start = @as(u64, bv.byteOffset) + @as(u64, a.byteOffset);
+        const total: u64 = if (a.count == 0) 0 else (@as(u64, a.count - 1) * stride + elem);
+        if (start + total > buf.len) return error.BufferOutOfBounds;
+        return buf[@intCast(start)..@intCast(start + total)];
+    }
+
+    pub fn asSlice(a: *const @This(), comptime T: type, gltf: *const Gltf, buffers: []const []const u8) AccessorReadError![]align(1) const T {
+        const elem = try a.elementSize();
+        if (@sizeOf(T) != elem) return error.ComponentTypeMismatch;
+        const bv_idx = a.bufferView orelse return error.NoBufferView;
+        const bvs = gltf.bufferViews orelse return error.BadBufferViewRef;
+        if (bv_idx >= bvs.len) return error.BadBufferViewRef;
+        const bv = bvs[bv_idx];
+        if (bv.byteStride) |s| if (s != elem) return error.StrideMismatch;
+        const raw = try a.bytes(gltf, buffers);
+        return std.mem.bytesAsSlice(T, raw);
+    }
+
+    pub fn iterator(a: *const @This(), comptime T: type, gltf: *const Gltf, buffers: []const []const u8) AccessorReadError!AccessorIter(T) {
+        const elem = try a.elementSize();
+        if (@sizeOf(T) != elem) return error.ComponentTypeMismatch;
+        const bv_idx = a.bufferView orelse return error.NoBufferView;
+        const bvs = gltf.bufferViews orelse return error.BadBufferViewRef;
+        if (bv_idx >= bvs.len) return error.BadBufferViewRef;
+        const bv = bvs[bv_idx];
+        const stride: u64 = if (bv.byteStride) |s| s else elem;
+        const raw = try a.bytes(gltf, buffers);
+        return .{ .buffer = raw, .stride = stride, .count = a.count };
+    }
 };
+
+pub const AccessorReadError = error{
+    NoBufferView,
+    SparseNotSupported,
+    StrideMismatch,
+    ComponentTypeMismatch,
+    BufferIndexOutOfBounds,
+    BufferOutOfBounds,
+    BadBufferViewRef,
+    UnknownAccessorComponentType,
+};
+
+pub fn AccessorIter(comptime T: type) type {
+    return struct {
+        buffer: []const u8,
+        stride: u64,
+        count: u32,
+        i: u32 = 0,
+
+        pub fn next(self: *@This()) ?T {
+            if (self.i >= self.count) return null;
+            const off: usize = @intCast(@as(u64, self.i) * self.stride);
+            self.i += 1;
+            var out: T = undefined;
+            @memcpy(std.mem.asBytes(&out), self.buffer[off .. off + @sizeOf(T)]);
+            return out;
+        }
+
+        pub fn reset(self: *@This()) void {
+            self.i = 0;
+        }
+    };
+}
 
 pub const CameraKind = enum { perspective, orthographic };
 
@@ -1273,4 +1346,68 @@ test "parse Triangle sample" {
     const prim = p.value.meshes.?[0].primitives[0];
     try testing.expectEqual(@as(u32, 1), prim.attributes.map.get("POSITION").?);
     try testing.expectEqual(@as(u32, 0), prim.indices.?);
+}
+
+test "accessor asSlice dense" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "buffers":[{"byteLength":36}],
+        \\ "bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36}],
+        \\ "accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const verts = [_]f32{ 0, 0, 0, 1, 2, 3, 4, 5, 6 };
+    const bin = std.mem.sliceAsBytes(&verts);
+    const slice = try p.value.accessors.?[0].asSlice([3]f32, &p.value, &.{bin});
+    try testing.expectEqual(@as(usize, 3), slice.len);
+    try testing.expectEqual([3]f32{ 1, 2, 3 }, slice[1]);
+    try testing.expectEqual([3]f32{ 4, 5, 6 }, slice[2]);
+}
+
+test "accessor iterator with stride" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "buffers":[{"byteLength":40}],
+        \\ "bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":40,"byteStride":20}],
+        \\ "accessors":[{"bufferView":0,"componentType":5126,"count":2,"type":"VEC3"}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    // interleaved: [pos.xyz, pad, pad] [pos.xyz, pad, pad] (20-byte stride, 12-byte element)
+    const raw = [_]f32{ 1, 2, 3, 9, 9, 4, 5, 6, 9, 9 };
+    const bin = std.mem.sliceAsBytes(&raw);
+    var it = try p.value.accessors.?[0].iterator([3]f32, &p.value, &.{bin});
+    try testing.expectEqual([3]f32{ 1, 2, 3 }, it.next().?);
+    try testing.expectEqual([3]f32{ 4, 5, 6 }, it.next().?);
+    try testing.expectEqual(@as(?[3]f32, null), it.next());
+}
+
+test "accessor bytes error on sparse" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "buffers":[{"byteLength":12}],
+        \\ "bufferViews":[{"buffer":0,"byteLength":12}],
+        \\ "accessors":[{"componentType":5126,"count":3,"type":"SCALAR",
+        \\   "sparse":{"count":1,
+        \\     "indices":{"bufferView":0,"componentType":5123},
+        \\     "values":{"bufferView":0}}}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const bin = [_]u8{0} ** 12;
+    try testing.expectError(error.SparseNotSupported, p.value.accessors.?[0].bytes(&p.value, &.{&bin}));
+}
+
+test "accessor asSlice rejects stride mismatch" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "buffers":[{"byteLength":40}],
+        \\ "bufferViews":[{"buffer":0,"byteLength":40,"byteStride":20}],
+        \\ "accessors":[{"bufferView":0,"componentType":5126,"count":2,"type":"VEC3"}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const bin = [_]u8{0} ** 40;
+    try testing.expectError(error.StrideMismatch, p.value.accessors.?[0].asSlice([3]f32, &p.value, &.{&bin}));
 }
