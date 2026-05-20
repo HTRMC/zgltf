@@ -112,6 +112,19 @@ pub const Accessor = struct {
     name: ?[]const u8 = null,
     extensions: ?Extensions = null,
     extras: ?Extras = null,
+
+    pub fn elementSize(a: *const @This()) ValidationError!u64 {
+        const ct: ComponentType = switch (a.componentType) {
+            5120 => .byte,
+            5121 => .unsigned_byte,
+            5122 => .short,
+            5123 => .unsigned_short,
+            5125 => .unsigned_int,
+            5126 => .float,
+            else => return error.UnknownAccessorComponentType,
+        };
+        return @as(u64, ct.byteSize()) * a.type.componentCount();
+    }
 };
 
 pub const CameraKind = enum { perspective, orthographic };
@@ -463,19 +476,6 @@ fn checkIdx(idx: u32, n: usize, err: ValidationError) ValidationError!void {
     if (idx >= n) return err;
 }
 
-fn elementSize(a: Accessor) ValidationError!u64 {
-    const ct: ComponentType = switch (a.componentType) {
-        5120 => .byte,
-        5121 => .unsigned_byte,
-        5122 => .short,
-        5123 => .unsigned_short,
-        5125 => .unsigned_int,
-        5126 => .float,
-        else => return error.UnknownAccessorComponentType,
-    };
-    return @as(u64, ct.byteSize()) * a.type.componentCount();
-}
-
 pub fn validate(g: *const Gltf) ValidationError!void {
     const n_nodes = countOf(g.nodes);
     const n_meshes = countOf(g.meshes);
@@ -569,7 +569,7 @@ pub fn validate(g: *const Gltf) ValidationError!void {
     };
 
     if (g.accessors) |accs| for (accs) |a| {
-        const elem_size = try elementSize(a);
+        const elem_size = try a.elementSize();
         const ncomp = a.type.componentCount();
         if (a.min) |m| if (m.len != ncomp) return error.AccessorMinMaxLengthMismatch;
         if (a.max) |m| if (m.len != ncomp) return error.AccessorMinMaxLengthMismatch;
