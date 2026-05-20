@@ -158,6 +158,30 @@ pub const Accessor = struct {
         return std.mem.bytesAsSlice(T, raw);
     }
 
+    pub fn readIndicesU32(a: *const @This(), gltf: *const Gltf, buffers: []const []const u8, out: []u32) AccessorReadError!void {
+        if (a.type != .SCALAR) return error.ComponentTypeMismatch;
+        if (out.len < a.count) return error.BufferOutOfBounds;
+        const ct = try ComponentType.fromInt(a.componentType);
+        switch (ct) {
+            .unsigned_byte => {
+                var it = try a.iterator(u8, gltf, buffers);
+                var i: u32 = 0;
+                while (it.next()) |v| : (i += 1) out[i] = v;
+            },
+            .unsigned_short => {
+                var it = try a.iterator(u16, gltf, buffers);
+                var i: u32 = 0;
+                while (it.next()) |v| : (i += 1) out[i] = v;
+            },
+            .unsigned_int => {
+                var it = try a.iterator(u32, gltf, buffers);
+                var i: u32 = 0;
+                while (it.next()) |v| : (i += 1) out[i] = v;
+            },
+            else => return error.ComponentTypeMismatch,
+        }
+    }
+
     pub fn iterator(a: *const @This(), comptime T: type, gltf: *const Gltf, buffers: []const []const u8) AccessorReadError!AccessorIter(T) {
         const elem = try a.elementSize();
         if (@sizeOf(T) != elem) return error.ComponentTypeMismatch;
@@ -1410,4 +1434,49 @@ test "accessor asSlice rejects stride mismatch" {
     defer p.deinit();
     const bin = [_]u8{0} ** 40;
     try testing.expectError(error.StrideMismatch, p.value.accessors.?[0].asSlice([3]f32, &p.value, &.{&bin}));
+}
+
+test "accessor readIndicesU32 from u16" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "buffers":[{"byteLength":8}],
+        \\ "bufferViews":[{"buffer":0,"byteLength":8}],
+        \\ "accessors":[{"bufferView":0,"componentType":5123,"count":4,"type":"SCALAR"}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const indices = [_]u16{ 10, 20, 30, 65535 };
+    const bin = std.mem.sliceAsBytes(&indices);
+    var out: [4]u32 = undefined;
+    try p.value.accessors.?[0].readIndicesU32(&p.value, &.{bin}, &out);
+    try testing.expectEqualSlices(u32, &.{ 10, 20, 30, 65535 }, &out);
+}
+
+test "accessor readIndicesU32 from u8" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "buffers":[{"byteLength":3}],
+        \\ "bufferViews":[{"buffer":0,"byteLength":3}],
+        \\ "accessors":[{"bufferView":0,"componentType":5121,"count":3,"type":"SCALAR"}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const indices = [_]u8{ 1, 2, 255 };
+    var out: [3]u32 = undefined;
+    try p.value.accessors.?[0].readIndicesU32(&p.value, &.{&indices}, &out);
+    try testing.expectEqualSlices(u32, &.{ 1, 2, 255 }, &out);
+}
+
+test "accessor readIndicesU32 rejects non-scalar" {
+    const json =
+        \\{"asset":{"version":"2.0"},
+        \\ "buffers":[{"byteLength":24}],
+        \\ "bufferViews":[{"buffer":0,"byteLength":24}],
+        \\ "accessors":[{"bufferView":0,"componentType":5123,"count":2,"type":"VEC3"}]}
+    ;
+    var p = try parseSlice(testing.allocator, json);
+    defer p.deinit();
+    const bin = [_]u8{0} ** 24;
+    var out: [2]u32 = undefined;
+    try testing.expectError(error.ComponentTypeMismatch, p.value.accessors.?[0].readIndicesU32(&p.value, &.{&bin}, &out));
 }
