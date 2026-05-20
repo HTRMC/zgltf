@@ -29,6 +29,18 @@ pub const ComponentType = enum(u32) {
             .unsigned_int, .float => 4,
         };
     }
+
+    pub fn fromInt(v: u32) error{UnknownAccessorComponentType}!ComponentType {
+        return switch (v) {
+            5120 => .byte,
+            5121 => .unsigned_byte,
+            5122 => .short,
+            5123 => .unsigned_short,
+            5125 => .unsigned_int,
+            5126 => .float,
+            else => error.UnknownAccessorComponentType,
+        };
+    }
 };
 
 pub const AccessorType = enum {
@@ -114,15 +126,7 @@ pub const Accessor = struct {
     extras: ?Extras = null,
 
     pub fn elementSize(a: *const @This()) ValidationError!u64 {
-        const ct: ComponentType = switch (a.componentType) {
-            5120 => .byte,
-            5121 => .unsigned_byte,
-            5122 => .short,
-            5123 => .unsigned_short,
-            5125 => .unsigned_int,
-            5126 => .float,
-            else => return error.UnknownAccessorComponentType,
-        };
+        const ct = try ComponentType.fromInt(a.componentType);
         return @as(u64, ct.byteSize()) * a.type.componentCount();
     }
 };
