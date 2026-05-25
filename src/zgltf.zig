@@ -313,11 +313,80 @@ pub const Image = struct {
     extras: ?Extras = null,
 };
 
+fn intToEnumChecked(comptime E: type, raw: u32) !E {
+    inline for (@typeInfo(E).@"enum".fields) |field| {
+        if (field.value == raw) return @field(E, field.name);
+    }
+    return error.UnexpectedToken;
+}
+
+pub const MagFilter = enum(u32) {
+    nearest = 9728,
+    linear = 9729,
+
+    pub fn jsonParse(allocator: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !MagFilter {
+        const raw = try std.json.innerParse(u32, allocator, source, options);
+        return intToEnumChecked(MagFilter, raw);
+    }
+
+    pub fn jsonParseFromValue(allocator: std.mem.Allocator, source: std.json.Value, options: std.json.ParseOptions) !MagFilter {
+        const raw = try std.json.innerParseFromValue(u32, allocator, source, options);
+        return intToEnumChecked(MagFilter, raw);
+    }
+
+    pub fn jsonStringify(self: MagFilter, jws: anytype) !void {
+        try jws.write(@intFromEnum(self));
+    }
+};
+
+pub const MinFilter = enum(u32) {
+    nearest = 9728,
+    linear = 9729,
+    nearest_mipmap_nearest = 9984,
+    linear_mipmap_nearest = 9985,
+    nearest_mipmap_linear = 9986,
+    linear_mipmap_linear = 9987,
+
+    pub fn jsonParse(allocator: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !MinFilter {
+        const raw = try std.json.innerParse(u32, allocator, source, options);
+        return intToEnumChecked(MinFilter, raw);
+    }
+
+    pub fn jsonParseFromValue(allocator: std.mem.Allocator, source: std.json.Value, options: std.json.ParseOptions) !MinFilter {
+        const raw = try std.json.innerParseFromValue(u32, allocator, source, options);
+        return intToEnumChecked(MinFilter, raw);
+    }
+
+    pub fn jsonStringify(self: MinFilter, jws: anytype) !void {
+        try jws.write(@intFromEnum(self));
+    }
+};
+
+pub const WrapMode = enum(u32) {
+    clamp_to_edge = 33071,
+    mirrored_repeat = 33648,
+    repeat = 10497,
+
+    pub fn jsonParse(allocator: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !WrapMode {
+        const raw = try std.json.innerParse(u32, allocator, source, options);
+        return intToEnumChecked(WrapMode, raw);
+    }
+
+    pub fn jsonParseFromValue(allocator: std.mem.Allocator, source: std.json.Value, options: std.json.ParseOptions) !WrapMode {
+        const raw = try std.json.innerParseFromValue(u32, allocator, source, options);
+        return intToEnumChecked(WrapMode, raw);
+    }
+
+    pub fn jsonStringify(self: WrapMode, jws: anytype) !void {
+        try jws.write(@intFromEnum(self));
+    }
+};
+
 pub const Sampler = struct {
-    magFilter: ?u32 = null,
-    minFilter: ?u32 = null,
-    wrapS: u32 = 10497,
-    wrapT: u32 = 10497,
+    magFilter: ?MagFilter = null,
+    minFilter: ?MinFilter = null,
+    wrapS: WrapMode = .repeat,
+    wrapT: WrapMode = .repeat,
     name: ?[]const u8 = null,
     extensions: ?Extensions = null,
     extras: ?Extras = null,
@@ -964,9 +1033,9 @@ test "sampler defaults" {
     var p = try parseSlice(testing.allocator, json);
     defer p.deinit();
     const s = p.value.samplers.?[0];
-    try testing.expectEqual(@as(u32, 10497), s.wrapS);
-    try testing.expectEqual(@as(u32, 10497), s.wrapT);
-    try testing.expectEqual(@as(?u32, null), s.magFilter);
+    try testing.expectEqual(WrapMode.repeat, s.wrapS);
+    try testing.expectEqual(WrapMode.repeat, s.wrapT);
+    try testing.expectEqual(@as(?MagFilter, null), s.magFilter);
 }
 
 test "image bufferView" {
@@ -999,8 +1068,8 @@ test "parse BoxTextured sample" {
     try testing.expectEqual(@as(u32, 0), p.value.textures.?[0].sampler.?);
     try testing.expectEqual(@as(u32, 0), p.value.textures.?[0].source.?);
     try testing.expectEqualStrings("CesiumLogoFlat.png", p.value.images.?[0].uri.?);
-    try testing.expectEqual(@as(?u32, 9729), p.value.samplers.?[0].magFilter);
-    try testing.expectEqual(@as(?u32, 9986), p.value.samplers.?[0].minFilter);
+    try testing.expectEqual(MagFilter.linear, p.value.samplers.?[0].magFilter.?);
+    try testing.expectEqual(MinFilter.nearest_mipmap_linear, p.value.samplers.?[0].minFilter.?);
 }
 
 test "validate Triangle sample" {
